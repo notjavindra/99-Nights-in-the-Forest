@@ -8,7 +8,7 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local Window = OrionLib:MakeWindow({
-    Name = "🌲 99 Nights in the Forest Script 🌙",
+    Name = "99 Nights in the Forest 🔦 [👽ALIENS]",
     HidePremium = false,
     SaveConfig = true,
     ConfigFolder = "99NightsCFG"
