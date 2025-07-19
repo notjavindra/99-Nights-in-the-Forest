@@ -1,17 +1,13 @@
--- Load OrionLib
-local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
-
--- Services
+-- ✅ Correct OrionLib
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/ionlyusegithubformcmods/1-Line-Scripts/main/Mobile%20Friendly%20Orion')))()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
-local Workspace = game:GetService("Workspace")
 local UIS = game:GetService("UserInputService")
-
+local Workspace = game:GetService("Workspace")
 local Player = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
 
--- UI
+-- UI Window
 local Window = OrionLib:MakeWindow({
     Name = "🌲 99 Nights in the Forest 🌙",
     HidePremium = false,
@@ -19,82 +15,45 @@ local Window = OrionLib:MakeWindow({
     ConfigFolder = "NightsConfig"
 })
 
+-- Notify
 OrionLib:MakeNotification({
-    Name = "Logged In!",
-    Content = "Welcome " .. Player.Name .. "!",
+    Name = "Welcome!",
+    Content = "Enjoy, " .. Player.Name .. "!",
     Image = "rbxassetid://4483345998",
     Time = 5
 })
 
--- ========== STATE VARIABLES ==========
-local FullBrightOn = false
-local NoFogOn = false
-local ESP_Toggles = {
-    Deer = false,
-    Player = false,
-    Bunny = false,
-    Wolf = false,
-    Scrap = false
+-- 🟦 Variables
+local settings = {
+    NoFog = false,
+    FullBright = false,
+    Fly = false,
+    ESP = {
+        Deer = false,
+        Players = false,
+        Rabbits = false,
+        Wolves = false,
+        Scraps = false
+    }
 }
-local ESP_Objects = {}
 
--- ========== MAIN TAB ==========
-local MainTab = Window:MakeTab({ Name = "Main", Icon = "rbxassetid://4483345998", PremiumOnly = false })
-
-MainTab:AddTextbox({
-    Name = "🏃 WalkSpeed",
-    Default = "16",
-    TextDisappear = true,
-    Callback = function(Value)
-        local h = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
-        if h then h.WalkSpeed = tonumber(Value) or 16 end
+-- 🌞 Auto Refresh Lighting every 0.1s
+RunService.RenderStepped:Connect(function()
+    if settings.FullBright then
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 12
+        Lighting.FogEnd = 1e10
+        Lighting.GlobalShadows = false
+        Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
     end
-})
-
-MainTab:AddTextbox({
-    Name = "🦘 JumpPower",
-    Default = "50",
-    TextDisappear = true,
-    Callback = function(Value)
-        local h = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
-        if h then h.JumpPower = tonumber(Value) or 50 end
-    end
-})
-
-MainTab:AddToggle({
-    Name = "🌫️ No Fog",
-    Default = false,
-    Callback = function(val) NoFogOn = val end
-})
-
-MainTab:AddToggle({
-    Name = "💡 FullBright",
-    Default = false,
-    Callback = function(val) FullBrightOn = val end
-})
-
--- Auto apply fog/fullbright every 0.1s
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        if FullBrightOn then
-            Lighting.Brightness = 2
-            Lighting.ClockTime = 12
-            Lighting.FogEnd = 1e10
-            Lighting.GlobalShadows = false
-            Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
-        end
-        if NoFogOn then
-            Lighting.FogEnd = 1e10
-        end
+    if settings.NoFog then
+        Lighting.FogEnd = 1e10
     end
 end)
 
--- ========== FLY MODE ==========
-local flying = false
-local flyConnection
-
-local function startFlying()
+-- ✈️ Fly Setup
+local connection
+local function startFly()
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
@@ -108,146 +67,190 @@ local function startFlying()
     bv.velocity = Vector3.zero
     bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
 
-    flyConnection = RunService.RenderStepped:Connect(function()
-        local camCF = Camera.CFrame
-        local dir = Vector3.zero
+    connection = RunService.RenderStepped:Connect(function()
+        local camCF = Workspace.CurrentCamera.CFrame
+        local move = Vector3.zero
 
-        if UIS:IsKeyDown(Enum.KeyCode.W) then dir += camCF.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.S) then dir -= camCF.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.A) then dir -= camCF.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.D) then dir += camCF.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.yAxis end
-        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.yAxis end
+        if UIS:IsKeyDown(Enum.KeyCode.W) then move += camCF.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then move -= camCF.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then move -= camCF.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then move += camCF.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.yAxis end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.yAxis end
 
-        bv.Velocity = dir.Magnitude > 0 and dir.Unit * 80 or Vector3.zero
+        bv.Velocity = move.Unit * 80
         bg.CFrame = camCF
     end)
 end
 
-local function stopFlying()
+local function stopFly()
+    if connection then connection:Disconnect() end
     local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-    if flyConnection then flyConnection:Disconnect() end
     if root then
-        for _, obj in ipairs(root:GetChildren()) do
-            if obj:IsA("BodyGyro") or obj:IsA("BodyVelocity") then obj:Destroy() end
+        for _,v in pairs(root:GetChildren()) do
+            if v:IsA("BodyGyro") or v:IsA("BodyVelocity") then v:Destroy() end
         end
     end
 end
+
+-- 🧠 ESP Utility
+local function highlightModel(model, color, tag)
+    if model:FindFirstChild("HumanoidRootPart") and not model:FindFirstChild(tag) then
+        local highlight = Instance.new("Highlight", model)
+        highlight.Name = tag
+        highlight.Adornee = model
+        highlight.FillColor = color
+        highlight.FillTransparency = 0.3
+        highlight.OutlineColor = color
+    end
+end
+
+local function removeESP(tag)
+    for _, m in pairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and m:FindFirstChild(tag) then
+            m[tag]:Destroy()
+        end
+    end
+end
+
+-- 🌳 Main Tab
+local MainTab = Window:MakeTab({
+    Name = "Main",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+MainTab:AddTextbox({
+    Name = "🏃 WalkSpeed",
+    Default = "16",
+    TextDisappear = true,
+    Callback = function(val)
+        local h = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+        if h then h.WalkSpeed = tonumber(val) or 16 end
+    end
+})
+
+MainTab:AddTextbox({
+    Name = "🦘 JumpPower",
+    Default = "50",
+    TextDisappear = true,
+    Callback = function(val)
+        local h = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+        if h then h.JumpPower = tonumber(val) or 50 end
+    end
+})
+
+MainTab:AddToggle({
+    Name = "🌫️ No Fog",
+    Default = false,
+    Callback = function(v)
+        settings.NoFog = v
+    end
+})
+
+MainTab:AddToggle({
+    Name = "💡 FullBright",
+    Default = false,
+    Callback = function(v)
+        settings.FullBright = v
+    end
+})
 
 MainTab:AddToggle({
     Name = "🕊️ Fly Mode",
     Default = false,
-    Callback = function(state)
-        flying = state
-        if flying then startFlying() else stopFlying() end
+    Callback = function(v)
+        settings.Fly = v
+        if v then startFly() else stopFly() end
     end
 })
 
--- ========== ESP ==========
-local function createESP(part, color)
-    if not part or part:FindFirstChild("ESP") then return end
-    local box = Instance.new("BoxHandleAdornment", part)
-    box.Name = "ESP"
-    box.Size = part.Size + Vector3.new(0.1, 0.1, 0.1)
-    box.Adornee = part
-    box.AlwaysOnTop = true
-    box.ZIndex = 10
-    box.Color3 = color
-    box.Transparency = 0.5
-end
+-- 🧠 Misc Tab (ESP)
+local MiscTab = Window:MakeTab({
+    Name = "Misc",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
 
-local function clearAllESP()
-    for _, v in ipairs(ESP_Objects) do
-        if v and v:FindFirstChild("ESP") then v.ESP:Destroy() end
-    end
-    ESP_Objects = {}
-end
-
-local function scanForESP()
-    clearAllESP()
-
-    -- Deer (workspace.Characters)
-    if ESP_Toggles.Deer then
-        for _, char in pairs(Workspace:FindFirstChild("Characters"):GetChildren()) do
-            if char:IsA("Model") and char:FindFirstChild("HumanoidRootPart") then
-                createESP(char.HumanoidRootPart, Color3.new(1, 0, 0)) -- Red
-                table.insert(ESP_Objects, char.HumanoidRootPart)
+-- ESP Loop
+RunService.RenderStepped:Connect(function()
+    if settings.ESP.Deer then
+        for _, model in pairs(Workspace.Characters:GetChildren()) do
+            if model.Name:lower():find("deer") then
+                highlightModel(model, Color3.new(1, 0, 0), "ESP_Deer")
             end
         end
+    else
+        removeESP("ESP_Deer")
     end
 
-    -- Bunny (workspace.Characters.Bunny)
-    if ESP_Toggles.Bunny then
-        local bunnyFolder = Workspace:FindFirstChild("Characters") and Workspace.Characters:FindFirstChild("Bunny")
-        if bunnyFolder then
-            for _, b in pairs(bunnyFolder:GetChildren()) do
-                if b:IsA("Model") and b:FindFirstChild("HumanoidRootPart") then
-                    createESP(b.HumanoidRootPart, Color3.new(1, 0.5, 0)) -- Orange
-                    table.insert(ESP_Objects, b.HumanoidRootPart)
-                end
-            end
-        end
-    end
-
-    -- Wolf (workspace.Characters.Wolf)
-    if ESP_Toggles.Wolf then
-        local wolfFolder = Workspace:FindFirstChild("Characters") and Workspace.Characters:FindFirstChild("Wolf")
-        if wolfFolder then
-            for _, w in pairs(wolfFolder:GetChildren()) do
-                if w:IsA("Model") and w:FindFirstChild("HumanoidRootPart") then
-                    createESP(w.HumanoidRootPart, Color3.new(0.5, 0, 1)) -- Purple
-                    table.insert(ESP_Objects, w.HumanoidRootPart)
-                end
-            end
-        end
-    end
-
-    -- Player ESP
-    if ESP_Toggles.Player then
+    if settings.ESP.Players then
         for _, p in pairs(Players:GetPlayers()) do
-            if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                createESP(p.Character.HumanoidRootPart, Color3.new(0, 0, 1)) -- Blue
-                table.insert(ESP_Objects, p.Character.HumanoidRootPart)
+            if p ~= Player and p.Character then
+                highlightModel(p.Character, Color3.new(0, 0, 1), "ESP_Player")
             end
         end
+    else
+        removeESP("ESP_Player")
     end
-end
 
--- ESP Tab
-local ESPTab = Window:MakeTab({ Name = "🧠 ESP", Icon = "rbxassetid://7350979880", PremiumOnly = false })
+    if settings.ESP.Rabbits then
+        for _, model in pairs(Workspace.Characters:GetChildren()) do
+            if model.Name:lower():find("bunny") then
+                highlightModel(model, Color3.new(1, 0.5, 0), "ESP_Bunny")
+            end
+        end
+    else
+        removeESP("ESP_Bunny")
+    end
 
-ESPTab:AddToggle({
-    Name = "🔴 Deer Monster ESP",
-    Default = false,
-    Callback = function(state) ESP_Toggles.Deer = state end
-})
-ESPTab:AddToggle({
-    Name = "🔵 Player ESP",
-    Default = false,
-    Callback = function(state) ESP_Toggles.Player = state end
-})
-ESPTab:AddToggle({
-    Name = "🟠 Rabbits ESP",
-    Default = false,
-    Callback = function(state) ESP_Toggles.Bunny = state end
-})
-ESPTab:AddToggle({
-    Name = "🟣 Wolves ESP",
-    Default = false,
-    Callback = function(state) ESP_Toggles.Wolf = state end
-})
-ESPTab:AddToggle({
-    Name = "🟢 Scraps ESP (soon)",
-    Default = false,
-    Callback = function(state) ESP_Toggles.Scrap = state end
-})
+    if settings.ESP.Wolves then
+        for _, model in pairs(Workspace.Characters:GetChildren()) do
+            if model.Name:lower():find("wolf") then
+                highlightModel(model, Color3.fromRGB(128, 0, 128), "ESP_Wolf")
+            end
+        end
+    else
+        removeESP("ESP_Wolf")
+    end
 
--- Auto-update ESP every 0.5s
-task.spawn(function()
-    while true do
-        task.wait(0.5)
-        scanForESP()
+    if settings.ESP.Scraps then
+        for _, model in pairs(Workspace:GetDescendants()) do
+            if model:IsA("Model") and model.Name:lower():find("scrap") then
+                highlightModel(model, Color3.new(0, 1, 0), "ESP_Scrap")
+            end
+        end
+    else
+        removeESP("ESP_Scrap")
     end
 end)
 
+-- ESP Toggles
+MiscTab:AddToggle({
+    Name = "🔴 Deer Monster ESP",
+    Default = false,
+    Callback = function(v) settings.ESP.Deer = v end
+})
+MiscTab:AddToggle({
+    Name = "🔵 Players ESP",
+    Default = false,
+    Callback = function(v) settings.ESP.Players = v end
+})
+MiscTab:AddToggle({
+    Name = "🟠 Rabbits ESP",
+    Default = false,
+    Callback = function(v) settings.ESP.Rabbits = v end
+})
+MiscTab:AddToggle({
+    Name = "🟣 Wolves ESP",
+    Default = false,
+    Callback = function(v) settings.ESP.Wolves = v end
+})
+MiscTab:AddToggle({
+    Name = "🟢 Scraps ESP",
+    Default = false,
+    Callback = function(v) settings.ESP.Scraps = v end
+})
+
+-- ✅ Final Init
 OrionLib:Init()
