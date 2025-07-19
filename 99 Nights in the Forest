@@ -249,3 +249,5 @@ task.spawn(function()
         scanForESP()
     end
 end)
+
+OrionLib:Init()
