@@ -1,69 +1,53 @@
-local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/ionlyusegithubformcmods/1-Line-Scripts/main/Mobile%20Friendly%20Orion')))()
-local Player = game.Players.LocalPlayer
+-- Load OrionLib
+local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
+
+-- Services
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local UIS = game:GetService("UserInputService")
-local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
-local setclipboard = setclipboard or function(text)
-    if syn then
-        syn.write_clipboard(text)
-    elseif clipboard_set then
-        clipboard_set(text)
-    else
-        print("Clipboard not supported. Link: https://discord.gg/YCe6ZtVKXW")
-    end
-end
 
--- Copy Discord link and open on script start
-setclipboard("https://discord.gg/YCe6ZtVKXW")
-spawn(function()
-    if syn and syn.request then
-        syn.request({Url = "http://www.roblox.com/games/place?id=" .. game.PlaceId .. "&linkId=" .. HttpService:GenerateGUID(false), Method = "GET"})
-    else
-        game:HttpGet("https://discord.gg/YCe6ZtVKXW")
-    end
-end)
-OrionLib:MakeNotification({
-    Name = "Discord Link",
-    Content = "Discord link copied to clipboard and opened!",
-    Image = "rbxassetid://4483345998",
-    Time = 5
-})
+local Player = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
 
+-- UI
 local Window = OrionLib:MakeWindow({
-    Name = "99 Nights in the Forest 🔦 [👽ALIENS]",
+    Name = "🌲 99 Nights in the Forest 🌙",
     HidePremium = false,
     SaveConfig = true,
-    ConfigFolder = "OrionTest",
-    IntroText = "Loading Script..."
+    ConfigFolder = "NightsConfig"
 })
 
 OrionLib:MakeNotification({
     Name = "Logged In!",
-    Content = "Enjoy " .. Player.Name .. "!",
+    Content = "Welcome " .. Player.Name .. "!",
     Image = "rbxassetid://4483345998",
     Time = 5
 })
 
--- ======= MAIN TAB =======
-local MainTab = Window:MakeTab({
-    Name = "Main",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
-})
+-- ========== STATE VARIABLES ==========
+local FullBrightOn = false
+local NoFogOn = false
+local ESP_Toggles = {
+    Deer = false,
+    Player = false,
+    Bunny = false,
+    Wolf = false,
+    Scrap = false
+}
+local ESP_Objects = {}
+
+-- ========== MAIN TAB ==========
+local MainTab = Window:MakeTab({ Name = "Main", Icon = "rbxassetid://4483345998", PremiumOnly = false })
 
 MainTab:AddTextbox({
     Name = "🏃 WalkSpeed",
     Default = "16",
     TextDisappear = true,
     Callback = function(Value)
-        local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.WalkSpeed = tonumber(Value) or 16
-        end
+        local h = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+        if h then h.WalkSpeed = tonumber(Value) or 16 end
     end
 })
 
@@ -72,62 +56,60 @@ MainTab:AddTextbox({
     Default = "50",
     TextDisappear = true,
     Callback = function(Value)
-        local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.JumpPower = tonumber(Value) or 50
-        end
+        local h = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+        if h then h.JumpPower = tonumber(Value) or 50 end
     end
 })
 
 MainTab:AddToggle({
     Name = "🌫️ No Fog",
     Default = false,
-    Callback = function(Value)
-        game:GetService("Lighting").FogEnd = Value and 1e10 or 1000
-    end
+    Callback = function(val) NoFogOn = val end
 })
 
 MainTab:AddToggle({
     Name = "💡 FullBright",
     Default = false,
-    Callback = function(Value)
-        local Lighting = game:GetService("Lighting")
-        if Value then
+    Callback = function(val) FullBrightOn = val end
+})
+
+-- Auto apply fog/fullbright every 0.1s
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if FullBrightOn then
             Lighting.Brightness = 2
             Lighting.ClockTime = 12
             Lighting.FogEnd = 1e10
             Lighting.GlobalShadows = false
-            Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
-        else
-            Lighting.Brightness = 1
-            Lighting.ClockTime = 14
-            Lighting.FogEnd = 1000
-            Lighting.GlobalShadows = true
-            Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+            Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+        end
+        if NoFogOn then
+            Lighting.FogEnd = 1e10
         end
     end
-})
+end)
 
+-- ========== FLY MODE ==========
 local flying = false
-local flySpeed = 50
-local flyBodyGyro, flyBodyVelocity
+local flyConnection
 
 local function startFlying()
-    local character = Player.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local char = Player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
-    flyBodyGyro = Instance.new("BodyGyro", root)
-    flyBodyGyro.P = 9e4
-    flyBodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
-    flyBodyGyro.cframe = root.CFrame
+    local bg = Instance.new("BodyGyro", root)
+    bg.P = 9e4
+    bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+    bg.CFrame = root.CFrame
 
-    flyBodyVelocity = Instance.new("BodyVelocity", root)
-    flyBodyVelocity.velocity = Vector3.new()
-    flyBodyVelocity.maxForce = Vector3.new(9e9, 9e9, 9e9)
+    local bv = Instance.new("BodyVelocity", root)
+    bv.velocity = Vector3.zero
+    bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
 
-    RunService:BindToRenderStep("FlyLoop", Enum.RenderPriority.Input.Value, function()
-        local camCF = Workspace.CurrentCamera.CFrame
+    flyConnection = RunService.RenderStepped:Connect(function()
+        local camCF = Camera.CFrame
         local dir = Vector3.zero
 
         if UIS:IsKeyDown(Enum.KeyCode.W) then dir += camCF.LookVector end
@@ -137,185 +119,133 @@ local function startFlying()
         if UIS:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.yAxis end
         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.yAxis end
 
-        flyBodyVelocity.Velocity = dir.Unit * flySpeed
-        flyBodyGyro.CFrame = camCF
+        bv.Velocity = dir.Magnitude > 0 and dir.Unit * 80 or Vector3.zero
+        bg.CFrame = camCF
     end)
 end
 
 local function stopFlying()
-    RunService:UnbindFromRenderStep("FlyLoop")
-    if flyBodyGyro then flyBodyGyro:Destroy() end
-    if flyBodyVelocity then flyBodyVelocity:Destroy() end
+    local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    if flyConnection then flyConnection:Disconnect() end
+    if root then
+        for _, obj in ipairs(root:GetChildren()) do
+            if obj:IsA("BodyGyro") or obj:IsA("BodyVelocity") then obj:Destroy() end
+        end
+    end
 end
 
 MainTab:AddToggle({
     Name = "🕊️ Fly Mode",
     Default = false,
-    Callback = function(Value)
-        flying = Value
-        if flying then
-            startFlying()
-        else
-            stopFlying()
-        end
+    Callback = function(state)
+        flying = state
+        if flying then startFlying() else stopFlying() end
     end
 })
 
--- ======= MISC TAB =======
-local MiscTab = Window:MakeTab({
-    Name = "Misc",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
-})
+-- ========== ESP ==========
+local function createESP(part, color)
+    if not part or part:FindFirstChild("ESP") then return end
+    local box = Instance.new("BoxHandleAdornment", part)
+    box.Name = "ESP"
+    box.Size = part.Size + Vector3.new(0.1, 0.1, 0.1)
+    box.Adornee = part
+    box.AlwaysOnTop = true
+    box.ZIndex = 10
+    box.Color3 = color
+    box.Transparency = 0.5
+end
 
-local antiAFK = false
-local fpsBoost = false
-local spinBot = false
-
-MiscTab:AddButton({
-    Name = "Auto Rejoin",
-    Callback = function()
-        local success, err = pcall(function()
-            TeleportService:Teleport(game.PlaceId, Player)
-        end)
-        OrionLib:MakeNotification({
-            Name = success and "Rejoin" or "Rejoin Failed",
-            Content = success and "Attempting to rejoin the server..." or "Error: " .. tostring(err),
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
+local function clearAllESP()
+    for _, v in ipairs(ESP_Objects) do
+        if v and v:FindFirstChild("ESP") then v.ESP:Destroy() end
     end
-})
+    ESP_Objects = {}
+end
 
-MiscTab:AddToggle({
-    Name = "Anti-AFK",
-    Default = false,
-    Callback = function(Value)
-        antiAFK = Value
-        if antiAFK then
-            spawn(function()
-                while antiAFK do
-                    task.wait(30)
-                    local virtualUser = game:GetService("VirtualUser")
-                    virtualUser:CaptureController()
-                    virtualUser:ClickButton2(Vector2.new())
-                end
-            end)
-        end
-        OrionLib:MakeNotification({
-            Name = "Anti-AFK",
-            Content = "Anti-AFK " .. (antiAFK and "enabled" or "disabled"),
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-    end
-})
+local function scanForESP()
+    clearAllESP()
 
-MiscTab:AddButton({
-    Name = "Server Hop",
-    Callback = function()
-        local servers = {}
-        local req = HttpService:GetAsync("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
-        local data = HttpService:JSONDecode(req)
-        for _, server in pairs(data.data) do
-            if server.playing < server.maxPlayers and server.id ~= game.JobId then
-                table.insert(servers, server.id)
+    -- Deer (workspace.Characters)
+    if ESP_Toggles.Deer then
+        for _, char in pairs(Workspace:FindFirstChild("Characters"):GetChildren()) do
+            if char:IsA("Model") and char:FindFirstChild("HumanoidRootPart") then
+                createESP(char.HumanoidRootPart, Color3.new(1, 0, 0)) -- Red
+                table.insert(ESP_Objects, char.HumanoidRootPart)
             end
         end
-        if #servers > 0 then
-            local randomServer = servers[math.random(1, #servers)]
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, Player)
-            OrionLib:MakeNotification({
-                Name = "Server Hop",
-                Content = "Hopping to a new server...",
-                Image = "rbxassetid://4483345998",
-                Time = 3
-            })
-        else
-            OrionLib:MakeNotification({
-                Name = "Server Hop Failed",
-                Content = "No available servers found.",
-                Image = "rbxassetid://4483345998",
-                Time = 3
-            })
-        end
     end
-})
 
-MiscTab:AddToggle({
-    Name = "FPS Booster",
-    Default = false,
-    Callback = function(Value)
-        fpsBoost = Value
-        local Lighting = game:GetService("Lighting")
-        if fpsBoost then
-            settings().Rendering.QualityLevel = 1
-            Lighting.GlobalShadows = false
-            Lighting.FogEnd = 9e9
-        else
-            settings().Rendering.QualityLevel = 6
-            Lighting.GlobalShadows = true
-            Lighting.FogEnd = 100000
-        end
-        OrionLib:MakeNotification({
-            Name = "FPS Booster",
-            Content = fpsBoost and "FPS Booster enabled" or "FPS Booster disabled",
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-    end
-})
-
-MiscTab:AddToggle({
-    Name = "Spin Bot",
-    Default = false,
-    Callback = function(Value)
-        spinBot = Value
-        if spinBot and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
-            spawn(function()
-                while spinBot do
-                    local root = Player.Character.HumanoidRootPart
-                    root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(5), 0)
-                    task.wait(0.01)
+    -- Bunny (workspace.Characters.Bunny)
+    if ESP_Toggles.Bunny then
+        local bunnyFolder = Workspace:FindFirstChild("Characters") and Workspace.Characters:FindFirstChild("Bunny")
+        if bunnyFolder then
+            for _, b in pairs(bunnyFolder:GetChildren()) do
+                if b:IsA("Model") and b:FindFirstChild("HumanoidRootPart") then
+                    createESP(b.HumanoidRootPart, Color3.new(1, 0.5, 0)) -- Orange
+                    table.insert(ESP_Objects, b.HumanoidRootPart)
                 end
-            end)
-        end
-        OrionLib:MakeNotification({
-            Name = "Spin Bot",
-            Content = spinBot and "Spin Bot enabled" or "Spin Bot disabled",
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-    end
-})
-
--- ======= CREDITS TAB =======
-local CreditsTab = Window:MakeTab({
-    Name = "Credits",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
-})
-
-CreditsTab:AddLabel("Scripted by Javindra.")
-CreditsTab:AddLabel("Founded by merquryhub.")
-CreditsTab:AddButton({
-    Name = "Join Discord Server",
-    Callback = function()
-        setclipboard("https://discord.gg/YCe6ZtVKXW")
-        OrionLib:MakeNotification({
-            Name = "Discord Link",
-            Content = "Link copied to clipboard! Opening Discord invite...",
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-        spawn(function()
-            if syn and syn.request then
-                syn.request({Url = "http://www.roblox.com/games/place?id=" .. game.PlaceId .. "&linkId=" .. HttpService:GenerateGUID(false), Method = "GET"})
-            else
-                game:HttpGet("https://discord.gg/YCe6ZtVKXW")
             end
-        end)
+        end
     end
+
+    -- Wolf (workspace.Characters.Wolf)
+    if ESP_Toggles.Wolf then
+        local wolfFolder = Workspace:FindFirstChild("Characters") and Workspace.Characters:FindFirstChild("Wolf")
+        if wolfFolder then
+            for _, w in pairs(wolfFolder:GetChildren()) do
+                if w:IsA("Model") and w:FindFirstChild("HumanoidRootPart") then
+                    createESP(w.HumanoidRootPart, Color3.new(0.5, 0, 1)) -- Purple
+                    table.insert(ESP_Objects, w.HumanoidRootPart)
+                end
+            end
+        end
+    end
+
+    -- Player ESP
+    if ESP_Toggles.Player then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                createESP(p.Character.HumanoidRootPart, Color3.new(0, 0, 1)) -- Blue
+                table.insert(ESP_Objects, p.Character.HumanoidRootPart)
+            end
+        end
+    end
+end
+
+-- ESP Tab
+local ESPTab = Window:MakeTab({ Name = "🧠 ESP", Icon = "rbxassetid://7350979880", PremiumOnly = false })
+
+ESPTab:AddToggle({
+    Name = "🔴 Deer Monster ESP",
+    Default = false,
+    Callback = function(state) ESP_Toggles.Deer = state end
+})
+ESPTab:AddToggle({
+    Name = "🔵 Player ESP",
+    Default = false,
+    Callback = function(state) ESP_Toggles.Player = state end
+})
+ESPTab:AddToggle({
+    Name = "🟠 Rabbits ESP",
+    Default = false,
+    Callback = function(state) ESP_Toggles.Bunny = state end
+})
+ESPTab:AddToggle({
+    Name = "🟣 Wolves ESP",
+    Default = false,
+    Callback = function(state) ESP_Toggles.Wolf = state end
+})
+ESPTab:AddToggle({
+    Name = "🟢 Scraps ESP (soon)",
+    Default = false,
+    Callback = function(state) ESP_Toggles.Scrap = state end
 })
 
-OrionLib:Init()
+-- Auto-update ESP every 0.5s
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        scanForESP()
+    end
+end)
