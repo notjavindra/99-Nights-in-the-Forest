@@ -3,6 +3,7 @@ local OrionLib = loadstring(game:HttpGet('https://raw.githubusercontent.com/ionl
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService") -- ✅ ADD THIS
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -117,7 +118,7 @@ end)
 -- // Tabs & UI // --
 
 -- Main Tab
-local MainTab = Window:MakeTab({Name = "🌟 Main", Icon = "rbxassetid://7734068321", PremiumOnly = false})
+local MainTab = Window:MakeTab({Name = "Main", Icon = "rbxassetid://7734068321", PremiumOnly = false})
 MainTab:AddTextbox({
     Name = "🏃 WalkSpeed",
     Default = "16",
@@ -157,7 +158,7 @@ MainTab:AddToggle({
 })
 
 -- ESP Tab
-local ESPTab = Window:MakeTab({Name = "🧠 ESP", Icon = "rbxassetid://7733985746", PremiumOnly = false})
+local ESPTab = Window:MakeTab({Name = "ESP", Icon = "rbxassetid://7733985746", PremiumOnly = false})
 ESPTab:AddToggle({
     Name = "🔴 Deer Monster ESP",
     Default = false,
@@ -228,7 +229,7 @@ ESPTab:AddToggle({
 })
 
 -- Misc Tab
-local MiscTab = Window:MakeTab({Name = "🧰 Misc", Icon = "rbxassetid://7733765391", PremiumOnly = false})
+local MiscTab = Window:MakeTab({Name = "Misc", Icon = "rbxassetid://7733765391", PremiumOnly = false})
 MiscTab:AddButton({
     Name = "🌀 Server Hop",
     Callback = function()
