@@ -3,7 +3,7 @@ local OrionLib = loadstring(game:HttpGet('https://raw.githubusercontent.com/ionl
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
-local UserInputService = game:GetService("UserInputService") -- ✅ ADD THIS
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -26,10 +26,8 @@ local espToggles = {
     ["Scraps"] = false
 }
 
--- // Functions // --
-
--- ESP Function
-function createESP(target, color, name)
+-- ESP
+function createESP(target, color)
     for _, obj in pairs(target:GetChildren()) do
         if obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") and not obj:FindFirstChild("99ESP") then
             local highlight = Instance.new("Highlight", obj)
@@ -51,12 +49,12 @@ function removeESP(target)
     end
 end
 
--- Fly Mode
+-- Fly
 local BodyGyro, BodyVelocity
 function setFly(state)
     flyEnabled = state
     if not state then
-        if LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
             if BodyGyro then BodyGyro:Destroy() end
             if BodyVelocity then BodyVelocity:Destroy() end
         end
@@ -93,14 +91,38 @@ function setFly(state)
                     moveDir -= Vector3.yAxis
                 end
 
-                BodyVelocity.velocity = moveDir.Unit * 100
+                if moveDir.Magnitude > 0 then
+                    BodyVelocity.velocity = moveDir.Unit * 100
+                else
+                    BodyVelocity.velocity = Vector3.zero
+                end
                 BodyGyro.CFrame = Camera.CFrame
             end
         end)()
     end
 end
 
--- FullBright & NoFog Update Loop
+-- Re-enable fly on respawn
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    if flyEnabled then setFly(true) end
+end)
+
+-- Safe WalkSpeed / JumpPower
+local function updateWalkSpeed(val)
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    if char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = val
+    end
+end
+local function updateJumpPower(val)
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    if char:FindFirstChild("Humanoid") then
+        char.Humanoid.JumpPower = val
+    end
+end
+
+-- Bright & Fog loop
 task.spawn(function()
     while true do
         if fullBrightEnabled then
@@ -115,16 +137,37 @@ task.spawn(function()
     end
 end)
 
--- // Tabs & UI // --
+-- ESP Refresh Loop
+task.spawn(function()
+    while true do
+        if espToggles["Players"] then
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer and plr.Character then
+                    createESP(plr.Character, Color3.fromRGB(0, 0, 255))
+                end
+            end
+        end
+        if espToggles["Deer"] then
+            createESP(workspace.Characters, Color3.fromRGB(255, 0, 0))
+        end
+        if espToggles["Bunny"] and workspace.Characters:FindFirstChild("Bunny") then
+            createESP(workspace.Characters.Bunny, Color3.fromRGB(255, 165, 0))
+        end
+        if espToggles["Wolf"] and workspace.Characters:FindFirstChild("Wolf") then
+            createESP(workspace.Characters.Wolf, Color3.fromRGB(128, 0, 128))
+        end
+        task.wait(2)
+    end
+end)
 
--- Main Tab
+-- UI Tabs
 local MainTab = Window:MakeTab({Name = "Main", Icon = "rbxassetid://7734068321", PremiumOnly = false})
 MainTab:AddTextbox({
     Name = "🏃 WalkSpeed",
     Default = "16",
     TextDisappear = false,
     Callback = function(val)
-        LocalPlayer.Character.Humanoid.WalkSpeed = tonumber(val)
+        updateWalkSpeed(tonumber(val))
     end
 })
 MainTab:AddTextbox({
@@ -132,7 +175,7 @@ MainTab:AddTextbox({
     Default = "50",
     TextDisappear = false,
     Callback = function(val)
-        LocalPlayer.Character.Humanoid.JumpPower = tonumber(val)
+        updateJumpPower(tonumber(val))
     end
 })
 MainTab:AddToggle({
@@ -157,18 +200,13 @@ MainTab:AddToggle({
     end
 })
 
--- ESP Tab
 local ESPTab = Window:MakeTab({Name = "ESP", Icon = "rbxassetid://7733985746", PremiumOnly = false})
 ESPTab:AddToggle({
     Name = "🔴 Deer Monster ESP",
     Default = false,
     Callback = function(val)
         espToggles["Deer"] = val
-        if val then
-            createESP(workspace.Characters, Color3.fromRGB(255, 0, 0), "Deer")
-        else
-            removeESP(workspace.Characters)
-        end
+        if not val then removeESP(workspace.Characters) end
     end
 })
 ESPTab:AddToggle({
@@ -176,13 +214,7 @@ ESPTab:AddToggle({
     Default = false,
     Callback = function(val)
         espToggles["Players"] = val
-        if val then
-            for _, plr in pairs(Players:GetPlayers()) do
-                if plr ~= LocalPlayer and plr.Character then
-                    createESP(plr.Character, Color3.fromRGB(0, 0, 255), "Player")
-                end
-            end
-        else
+        if not val then
             for _, plr in pairs(Players:GetPlayers()) do
                 if plr ~= LocalPlayer and plr.Character then
                     removeESP(plr.Character)
@@ -196,12 +228,8 @@ ESPTab:AddToggle({
     Default = false,
     Callback = function(val)
         espToggles["Bunny"] = val
-        if val and workspace.Characters:FindFirstChild("Bunny") then
-            createESP(workspace.Characters.Bunny, Color3.fromRGB(255, 165, 0), "Bunny")
-        else
-            if workspace.Characters:FindFirstChild("Bunny") then
-                removeESP(workspace.Characters.Bunny)
-            end
+        if not val and workspace.Characters:FindFirstChild("Bunny") then
+            removeESP(workspace.Characters.Bunny)
         end
     end
 })
@@ -210,12 +238,8 @@ ESPTab:AddToggle({
     Default = false,
     Callback = function(val)
         espToggles["Wolf"] = val
-        if val and workspace.Characters:FindFirstChild("Wolf") then
-            createESP(workspace.Characters.Wolf, Color3.fromRGB(128, 0, 128), "Wolf")
-        else
-            if workspace.Characters:FindFirstChild("Wolf") then
-                removeESP(workspace.Characters.Wolf)
-            end
+        if not val and workspace.Characters:FindFirstChild("Wolf") then
+            removeESP(workspace.Characters.Wolf)
         end
     end
 })
@@ -224,11 +248,9 @@ ESPTab:AddToggle({
     Default = false,
     Callback = function(val)
         espToggles["Scraps"] = val
-        -- future support
     end
 })
 
--- Misc Tab
 local MiscTab = Window:MakeTab({Name = "Misc", Icon = "rbxassetid://7733765391", PremiumOnly = false})
 MiscTab:AddButton({
     Name = "🌀 Server Hop",
@@ -249,5 +271,5 @@ MiscTab:AddButton({
     end
 })
 
--- Initialize UI
+-- Init
 OrionLib:Init()
